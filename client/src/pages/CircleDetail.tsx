@@ -4,10 +4,11 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { trpc } from "@/lib/trpc";
-import { Upload, Download, Users, Trash2, FileVideo, FileAudio, FileImage, Crown, UserMinus, ArrowLeft } from "lucide-react";
+import { Upload, Download, Users, Trash2, FileVideo, FileAudio, FileImage, Crown, UserMinus, ArrowLeft, Eye } from "lucide-react";
 import { useState, useRef } from "react";
 import { Link, useLocation, useParams } from "wouter";
 import { toast } from "sonner";
+import FilePreviewDialog from "@/components/FilePreviewDialog";
 
 export default function CircleDetail() {
   const { id } = useParams<{ id: string }>();
@@ -16,6 +17,8 @@ export default function CircleDetail() {
   const [, setLocation] = useLocation();
   const [uploadOpen, setUploadOpen] = useState(false);
   const [uploading, setUploading] = useState(false);
+  const [previewOpen, setPreviewOpen] = useState(false);
+  const [previewFile, setPreviewFile] = useState<any>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const { data: circle, isLoading, refetch } = trpc.circles.get.useQuery({ circleId });
@@ -109,6 +112,11 @@ export default function CircleDetail() {
     if (confirm(`确定要移除成员 ${userName || "该用户"} 吗？`)) {
       removeMemberMutation.mutate({ circleId, userId });
     }
+  };
+
+  const handlePreview = (file: any) => {
+    setPreviewFile(file);
+    setPreviewOpen(true);
   };
 
   const formatFileSize = (bytes: number) => {
@@ -254,11 +262,31 @@ export default function CircleDetail() {
                           </div>
                         </div>
                         <div className="flex items-center gap-2 flex-shrink-0">
-                          <Button asChild variant="outline" size="sm" className="gap-2">
-                            <a href={file.fileUrl} download={file.filename}>
-                              <Download className="w-4 h-4" />
-                              下载
-                            </a>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => handlePreview(file)}
+                            className="gap-2"
+                          >
+                            <Eye className="w-4 h-4" />
+                            预览
+                          </Button>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => {
+                              const link = document.createElement("a");
+                              link.href = file.fileUrl;
+                              link.download = file.filename;
+                              link.style.display = "none";
+                              document.body.appendChild(link);
+                              link.click();
+                              document.body.removeChild(link);
+                            }}
+                            className="gap-2"
+                          >
+                            <Download className="w-4 h-4" />
+                            下载
                           </Button>
                           {(file.uploaderId === user?.id || isOwner) && (
                             <Button
@@ -343,6 +371,12 @@ export default function CircleDetail() {
             </TabsContent>
           </Tabs>
         </div>
+
+        <FilePreviewDialog
+          open={previewOpen}
+          onOpenChange={setPreviewOpen}
+          file={previewFile}
+        />
       </main>
     </div>
   );

@@ -2,13 +2,17 @@ import { useAuth } from "@/_core/hooks/useAuth";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { trpc } from "@/lib/trpc";
-import { Circle, FileVideo, FileAudio, FileImage, Download, ArrowLeft, LogOut } from "lucide-react";
+import { Circle, FileVideo, FileAudio, FileImage, Download, ArrowLeft, LogOut, Eye } from "lucide-react";
 import { Link, useLocation } from "wouter";
 import { toast } from "sonner";
+import FilePreviewDialog from "@/components/FilePreviewDialog";
+import { useState } from "react";
 
 export default function Profile() {
   const { user } = useAuth();
   const [, setLocation] = useLocation();
+  const [previewOpen, setPreviewOpen] = useState(false);
+  const [previewFile, setPreviewFile] = useState<any>(null);
   const { data: myUploads, isLoading } = trpc.files.myUploads.useQuery();
   const logoutMutation = trpc.auth.logout.useMutation({
     onSuccess: () => {
@@ -30,6 +34,11 @@ export default function Profile() {
     if (type === "audio") return <FileAudio className="w-8 h-8 text-primary" />;
     if (type === "image") return <FileImage className="w-8 h-8 text-primary" />;
     return null;
+  };
+
+  const handlePreview = (file: any) => {
+    setPreviewFile(file);
+    setPreviewOpen(true);
   };
 
   return (
@@ -102,11 +111,31 @@ export default function Profile() {
                       </div>
                     </div>
                     <div className="flex items-center gap-2 flex-shrink-0">
-                      <Button asChild variant="outline" size="sm" className="gap-2">
-                        <a href={file.fileUrl} download={file.filename}>
-                          <Download className="w-4 h-4" />
-                          下载
-                        </a>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => handlePreview(file)}
+                        className="gap-2"
+                      >
+                        <Eye className="w-4 h-4" />
+                        预览
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => {
+                          const link = document.createElement("a");
+                          link.href = file.fileUrl;
+                          link.download = file.filename;
+                          link.style.display = "none";
+                          document.body.appendChild(link);
+                          link.click();
+                          document.body.removeChild(link);
+                        }}
+                        className="gap-2"
+                      >
+                        <Download className="w-4 h-4" />
+                        下载
                       </Button>
                       <Button asChild variant="outline" size="sm">
                         <Link href={`/circles/${file.circleId}`}>查看圈子</Link>
@@ -131,6 +160,12 @@ export default function Profile() {
             </Card>
           )}
         </div>
+
+        <FilePreviewDialog
+          open={previewOpen}
+          onOpenChange={setPreviewOpen}
+          file={previewFile}
+        />
       </main>
     </div>
   );
