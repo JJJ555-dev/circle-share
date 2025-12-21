@@ -1,6 +1,6 @@
 import { eq, and, desc, sql } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/mysql2";
-import { InsertUser, users, circles, circleMembers, files, InsertCircle, InsertCircleMember, InsertFile, User } from "../drizzle/schema";
+import { InsertUser, users, circles, circleMembers, files, folders, InsertCircle, InsertCircleMember, InsertFile, User } from "../drizzle/schema";
 import { ENV } from './_core/env';
 
 let _db: ReturnType<typeof drizzle> | null = null;
@@ -220,6 +220,7 @@ export async function getFilesByCircleId(circleId: number) {
     .select({
       id: files.id,
       circleId: files.circleId,
+      folderId: files.folderId,
       uploaderId: files.uploaderId,
       filename: files.filename,
       fileKey: files.fileKey,
@@ -269,4 +270,89 @@ export async function deleteFile(fileId: number) {
   if (!db) throw new Error("Database not available");
   
   await db.delete(files).where(eq(files.id, fileId));
+}
+
+// Folder functions
+export async function createFolder(data: any): Promise<number> {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  
+  const result = await db.insert(folders).values(data);
+  return result[0].insertId;
+}
+
+export async function getFolderById(folderId: number) {
+  const db = await getDb();
+  if (!db) return undefined;
+  
+  const result = await db.select().from(folders).where(eq(folders.id, folderId)).limit(1);
+  return result.length > 0 ? result[0] : undefined;
+}
+
+export async function getFoldersByCircleId(circleId: number) {
+  const db = await getDb();
+  if (!db) return [];
+  
+  const result = await db
+    .select({
+      id: folders.id,
+      circleId: folders.circleId,
+      name: folders.name,
+      description: folders.description,
+      createdBy: folders.createdBy,
+      createdAt: folders.createdAt,
+      updatedAt: folders.updatedAt,
+      creatorName: users.name,
+    })
+    .from(folders)
+    .innerJoin(users, eq(folders.createdBy, users.id))
+    .where(eq(folders.circleId, circleId))
+    .orderBy(desc(folders.createdAt));
+  
+  return result;
+}
+
+export async function updateFolder(folderId: number, data: any) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  
+  await db.update(folders).set(data).where(eq(folders.id, folderId));
+}
+
+export async function deleteFolder(folderId: number) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  
+  // Delete all files in the folder first
+  await db.update(files).set({ folderId: null }).where(eq(files.folderId, folderId));
+  
+  // Then delete the folder
+  await db.delete(folders).where(eq(folders.id, folderId));
+}
+
+export async function getFilesByFolderId(folderId: number) {
+  const db = await getDb();
+  if (!db) return [];
+  
+  const result = await db
+    .select({
+      id: files.id,
+      circleId: files.circleId,
+      folderId: files.folderId,
+      uploaderId: files.uploaderId,
+      filename: files.filename,
+      fileKey: files.fileKey,
+      fileUrl: files.fileUrl,
+      mimeType: files.mimeType,
+      fileSize: files.fileSize,
+      fileType: files.fileType,
+      uploadedAt: files.uploadedAt,
+      uploaderName: users.name,
+    })
+    .from(files)
+    .innerJoin(users, eq(files.uploaderId, users.id))
+    .where(eq(files.folderId, folderId))
+    .orderBy(desc(files.uploadedAt));
+  
+  return result;
 }

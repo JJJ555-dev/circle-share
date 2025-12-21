@@ -191,6 +191,7 @@ export const appRouter = router({
         fileData: z.string(),
         mimeType: z.string(),
         fileSize: z.number(),
+        folderId: z.number().optional(),
       }))
       .mutation(async ({ ctx, input }) => {
         const member = await db.getCircleMember(input.circleId, ctx.user.id);
@@ -217,6 +218,7 @@ export const appRouter = router({
 
         const fileId = await db.createFile({
           circleId: input.circleId,
+          folderId: input.folderId || null,
           uploaderId: ctx.user.id,
           filename: input.filename,
           fileKey,
@@ -264,6 +266,78 @@ export const appRouter = router({
     myUploads: protectedProcedure.query(async ({ ctx }) => {
       return await db.getFilesByUserId(ctx.user.id);
     }),
+  }),
+
+  folders: router({
+    create: protectedProcedure
+      .input(z.object({
+        circleId: z.number(),
+        name: z.string().min(1).max(255),
+        description: z.string().optional(),
+      }))
+      .mutation(async ({ ctx, input }) => {
+        const member = await db.getCircleMember(input.circleId, ctx.user.id);
+        if (!member) {
+          throw new TRPCError({ code: "FORBIDDEN", message: "Not a member of this circle" });
+        }
+
+        const folderId = await db.createFolder({
+          circleId: input.circleId,
+          name: input.name,
+          description: input.description || null,
+          createdBy: ctx.user.id,
+        });
+
+        return { folderId };
+      }),
+
+    list: protectedProcedure
+      .input(z.object({ circleId: z.number() }))
+      .query(async ({ ctx, input }) => {
+        const member = await db.getCircleMember(input.circleId, ctx.user.id);
+        if (!member) {
+          throw new TRPCError({ code: "FORBIDDEN", message: "Not a member of this circle" });
+        }
+
+        return await db.getFoldersByCircleId(input.circleId);
+      }),
+
+    rename: protectedProcedure
+      .input(z.object({
+        folderId: z.number(),
+        name: z.string().min(1).max(255),
+      }))
+      .mutation(async ({ ctx, input }) => {
+        const folder = await db.getFolderById(input.folderId);
+        if (!folder) {
+          throw new TRPCError({ code: "NOT_FOUND", message: "Folder not found" });
+        }
+
+        const member = await db.getCircleMember(folder.circleId, ctx.user.id);
+        if (!member) {
+          throw new TRPCError({ code: "FORBIDDEN", message: "Not a member of this circle" });
+        }
+
+        await db.updateFolder(input.folderId, { name: input.name });
+        return { success: true };
+      }),
+
+    delete: protectedProcedure
+      .input(z.object({ folderId: z.number() }))
+      .mutation(async ({ ctx, input }) => {
+        const folder = await db.getFolderById(input.folderId);
+        if (!folder) {
+          throw new TRPCError({ code: "NOT_FOUND", message: "Folder not found" });
+        }
+
+        const member = await db.getCircleMember(folder.circleId, ctx.user.id);
+        if (!member) {
+          throw new TRPCError({ code: "FORBIDDEN", message: "Not a member of this circle" });
+        }
+
+        await db.deleteFolder(input.folderId);
+        return { success: true };
+      }),
   }),
 });
 

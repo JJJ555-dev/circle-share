@@ -9,6 +9,7 @@ import { useState, useRef } from "react";
 import { Link, useLocation, useParams } from "wouter";
 import { toast } from "sonner";
 import FilePreviewDialog from "@/components/FilePreviewDialog";
+import FolderManager from "@/components/FolderManager";
 
 export default function CircleDetail() {
   const { id } = useParams<{ id: string }>();
@@ -19,9 +20,11 @@ export default function CircleDetail() {
   const [uploading, setUploading] = useState(false);
   const [previewOpen, setPreviewOpen] = useState(false);
   const [previewFile, setPreviewFile] = useState<any>(null);
+  const [selectedFolderId, setSelectedFolderId] = useState<number | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const { data: circle, isLoading, refetch } = trpc.circles.get.useQuery({ circleId });
+  const { data: files } = trpc.files.list.useQuery({ circleId });
   
   const uploadMutation = trpc.files.upload.useMutation({
     onSuccess: () => {
@@ -91,6 +94,7 @@ export default function CircleDetail() {
         fileData: base64,
         mimeType: file.type,
         fileSize: file.size,
+        folderId: selectedFolderId || undefined,
       });
     };
     reader.readAsDataURL(file);
@@ -132,6 +136,13 @@ export default function CircleDetail() {
     if (type === "image") return <FileImage className="w-8 h-8 text-primary" />;
     return null;
   };
+
+  const filteredFiles = files?.filter((file) => {
+    if (selectedFolderId === null) {
+      return !file.folderId;
+    }
+    return file.folderId === selectedFolderId;
+  }) || [];
 
   if (isLoading) {
     return (
@@ -237,15 +248,16 @@ export default function CircleDetail() {
           </div>
 
           <Tabs defaultValue="files" className="space-y-6">
-            <TabsList>
+            <TabsList className="grid w-full grid-cols-3">
               <TabsTrigger value="files">文件列表</TabsTrigger>
+              <TabsTrigger value="folders">文件夹</TabsTrigger>
               <TabsTrigger value="members">成员管理</TabsTrigger>
             </TabsList>
 
             <TabsContent value="files" className="space-y-4">
-              {circle.files && circle.files.length > 0 ? (
+              {filteredFiles && filteredFiles.length > 0 ? (
                 <div className="grid gap-4">
-                  {circle.files.map((file) => (
+                  {filteredFiles.map((file) => (
                     <Card key={file.id}>
                       <CardContent className="flex items-center justify-between p-6">
                         <div className="flex items-center gap-4 flex-1 min-w-0">
@@ -313,6 +325,82 @@ export default function CircleDetail() {
                   </CardContent>
                 </Card>
               )}
+            </TabsContent>
+
+            <TabsContent value="folders" className="space-y-4">
+              <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
+                <div className="lg:col-span-1">
+                  <FolderManager
+                    circleId={circleId}
+                    onFolderSelect={setSelectedFolderId}
+                    selectedFolderId={selectedFolderId}
+                  />
+                </div>
+                <div className="lg:col-span-3">
+                  {filteredFiles && filteredFiles.length > 0 ? (
+                    <div className="grid gap-4">
+                      {filteredFiles.map((file) => (
+                        <Card key={file.id}>
+                          <CardContent className="flex items-center justify-between p-6">
+                            <div className="flex items-center gap-4 flex-1 min-w-0">
+                              <div className="w-14 h-14 rounded-lg bg-primary/10 flex items-center justify-center flex-shrink-0">
+                                {getFileIcon(file.fileType)}
+                              </div>
+                              <div className="flex-1 min-w-0">
+                                <h3 className="font-semibold truncate">{file.filename}</h3>
+                                <div className="flex items-center gap-4 text-sm text-muted-foreground mt-1">
+                                  <span>{formatFileSize(file.fileSize)}</span>
+                                  <span>上传者: {file.uploaderName || "未知"}</span>
+                                  <span>{new Date(file.uploadedAt).toLocaleString()}</span>
+                                </div>
+                              </div>
+                            </div>
+                            <div className="flex items-center gap-2 flex-shrink-0">
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => handlePreview(file)}
+                                className="gap-2"
+                              >
+                                <Eye className="w-4 h-4" />
+                                预览
+                              </Button>
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => {
+                                  window.location.href = `/api/download/${file.id}`;
+                                }}
+                                className="gap-2"
+                              >
+                                <Download className="w-4 h-4" />
+                                下载
+                              </Button>
+                              {(file.uploaderId === user?.id || isOwner) && (
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() => handleDelete(file.id)}
+                                  className="gap-2 text-destructive hover:text-destructive"
+                                >
+                                  <Trash2 className="w-4 h-4" />
+                                  删除
+                                </Button>
+                              )}
+                            </div>
+                          </CardContent>
+                        </Card>
+                      ))}
+                    </div>
+                  ) : (
+                    <Card className="text-center py-16">
+                      <CardContent>
+                        <p className="text-muted-foreground">此文件夹中暂无文件</p>
+                      </CardContent>
+                    </Card>
+                  )}
+                </div>
+              </div>
             </TabsContent>
 
             <TabsContent value="members" className="space-y-4">

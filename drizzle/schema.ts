@@ -54,11 +54,31 @@ export type CircleMember = typeof circleMembers.$inferSelect;
 export type InsertCircleMember = typeof circleMembers.$inferInsert;
 
 /**
+ * Folders table - represents folders within circles for organizing files
+ */
+export const folders = mysqlTable("folders", {
+  id: int("id").autoincrement().primaryKey(),
+  circleId: int("circleId").notNull().references(() => circles.id, { onDelete: "cascade" }),
+  name: varchar("name", { length: 255 }).notNull(),
+  description: text("description"),
+  createdBy: int("createdBy").notNull().references(() => users.id, { onDelete: "cascade" }),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+}, (table) => ({
+  circleIdx: index("folder_circle_idx").on(table.circleId),
+  creatorIdx: index("folder_creator_idx").on(table.createdBy),
+}));
+
+export type Folder = typeof folders.$inferSelect;
+export type InsertFolder = typeof folders.$inferInsert;
+
+/**
  * Files table - stores metadata for uploaded files (actual files stored in S3)
  */
 export const files = mysqlTable("files", {
   id: int("id").autoincrement().primaryKey(),
   circleId: int("circleId").notNull().references(() => circles.id, { onDelete: "cascade" }),
+  folderId: int("folderId").references(() => folders.id, { onDelete: "set null" }),
   uploaderId: int("uploaderId").notNull().references(() => users.id, { onDelete: "cascade" }),
   filename: varchar("filename", { length: 500 }).notNull(),
   fileKey: varchar("fileKey", { length: 500 }).notNull(),
@@ -69,6 +89,7 @@ export const files = mysqlTable("files", {
   uploadedAt: timestamp("uploadedAt").defaultNow().notNull(),
 }, (table) => ({
   circleIdx: index("circle_idx").on(table.circleId),
+  folderIdx: index("folder_idx").on(table.folderId),
   uploaderIdx: index("uploader_idx").on(table.uploaderId),
   typeIdx: index("type_idx").on(table.fileType),
 }));
