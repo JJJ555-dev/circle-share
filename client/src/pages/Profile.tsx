@@ -103,7 +103,7 @@ export default function Profile() {
                     </div>
                     <div className="flex items-center gap-2 flex-shrink-0">
                       <Button asChild variant="outline" size="sm" className="gap-2">
-                        <a href={file.fileUrl} download={file.filename} target="_blank" rel="noopener noreferrer">
+                        <a href={file.fileUrl} download={file.filename}>
                           <Download className="w-4 h-4" />
                           下载
                         </a>
