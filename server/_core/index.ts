@@ -7,6 +7,7 @@ import { registerOAuthRoutes } from "./oauth";
 import { appRouter } from "../routers";
 import { createContext } from "./context";
 import { serveStatic, setupVite } from "./vite";
+import * as db from "../db";
 
 function isPortAvailable(port: number): Promise<boolean> {
   return new Promise(resolve => {
@@ -43,6 +44,30 @@ async function startServer() {
       createContext,
     })
   );
+
+  // File download endpoint
+  app.get("/api/download/:fileId", async (req, res) => {
+    try {
+      const fileId = parseInt(req.params.fileId);
+      const db = await require("../db").getDb();
+      if (!db) {
+        return res.status(500).json({ error: "Database not available" });
+      }
+
+      const file = await require("../db").getFileById(fileId);
+      if (!file) {
+        return res.status(404).json({ error: "File not found" });
+      }
+
+      // Redirect to S3 URL with Content-Disposition header
+      res.setHeader("Content-Disposition", `attachment; filename="${encodeURIComponent(file.filename)}"; filename*=UTF-8''${encodeURIComponent(file.filename)}`);
+      res.setHeader("Content-Type", file.mimeType || "application/octet-stream");
+      res.redirect(file.fileUrl);
+    } catch (error) {
+      console.error("Download error:", error);
+      res.status(500).json({ error: "Download failed" });
+    }
+  });
   // development mode uses Vite, production mode uses static files
   if (process.env.NODE_ENV === "development") {
     await setupVite(app, server);

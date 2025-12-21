@@ -6,6 +6,8 @@ interface FilePreviewDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   file: {
+    id?: number;
+    fileId?: number;
     filename: string;
     fileUrl: string;
     fileType: "video" | "audio" | "image";
@@ -17,13 +19,8 @@ export default function FilePreviewDialog({ open, onOpenChange, file }: FilePrev
   if (!file) return null;
 
   const handleDownload = () => {
-    const link = document.createElement("a");
-    link.href = file.fileUrl;
-    link.download = file.filename;
-    link.style.display = "none";
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
+    // Use the proper download endpoint with Content-Disposition header
+    window.location.href = `/api/download/${file.fileId}`;
   };
 
   return (

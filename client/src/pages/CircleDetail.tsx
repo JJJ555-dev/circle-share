@@ -275,13 +275,7 @@ export default function CircleDetail() {
                             variant="outline"
                             size="sm"
                             onClick={() => {
-                              const link = document.createElement("a");
-                              link.href = file.fileUrl;
-                              link.download = file.filename;
-                              link.style.display = "none";
-                              document.body.appendChild(link);
-                              link.click();
-                              document.body.removeChild(link);
+                              window.location.href = `/api/download/${file.id}`;
                             }}
                             className="gap-2"
                           >
