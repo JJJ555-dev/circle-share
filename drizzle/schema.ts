@@ -1,17 +1,10 @@
-import { int, mysqlEnum, mysqlTable, text, timestamp, varchar } from "drizzle-orm/mysql-core";
+import { int, mysqlEnum, mysqlTable, text, timestamp, varchar, bigint, index } from "drizzle-orm/mysql-core";
 
 /**
  * Core user table backing auth flow.
- * Extend this file with additional tables as your product grows.
- * Columns use camelCase to match both database fields and generated types.
  */
 export const users = mysqlTable("users", {
-  /**
-   * Surrogate primary key. Auto-incremented numeric value managed by the database.
-   * Use this for relations between tables.
-   */
   id: int("id").autoincrement().primaryKey(),
-  /** Manus OAuth identifier (openId) returned from the OAuth callback. Unique per user. */
   openId: varchar("openId", { length: 64 }).notNull().unique(),
   name: text("name"),
   email: varchar("email", { length: 320 }),
@@ -25,4 +18,60 @@ export const users = mysqlTable("users", {
 export type User = typeof users.$inferSelect;
 export type InsertUser = typeof users.$inferInsert;
 
-// TODO: Add your tables here
+/**
+ * Circles table - represents file sharing groups
+ */
+export const circles = mysqlTable("circles", {
+  id: int("id").autoincrement().primaryKey(),
+  name: varchar("name", { length: 255 }).notNull(),
+  description: text("description"),
+  creatorId: int("creatorId").notNull().references(() => users.id, { onDelete: "cascade" }),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+}, (table) => ({
+  creatorIdx: index("creator_idx").on(table.creatorId),
+}));
+
+export type Circle = typeof circles.$inferSelect;
+export type InsertCircle = typeof circles.$inferInsert;
+
+/**
+ * Circle members table - tracks which users belong to which circles
+ */
+export const circleMembers = mysqlTable("circle_members", {
+  id: int("id").autoincrement().primaryKey(),
+  circleId: int("circleId").notNull().references(() => circles.id, { onDelete: "cascade" }),
+  userId: int("userId").notNull().references(() => users.id, { onDelete: "cascade" }),
+  role: mysqlEnum("role", ["owner", "member"]).default("member").notNull(),
+  joinedAt: timestamp("joinedAt").defaultNow().notNull(),
+}, (table) => ({
+  circleIdx: index("circle_idx").on(table.circleId),
+  userIdx: index("user_idx").on(table.userId),
+  uniqueMembership: index("unique_membership").on(table.circleId, table.userId),
+}));
+
+export type CircleMember = typeof circleMembers.$inferSelect;
+export type InsertCircleMember = typeof circleMembers.$inferInsert;
+
+/**
+ * Files table - stores metadata for uploaded files (actual files stored in S3)
+ */
+export const files = mysqlTable("files", {
+  id: int("id").autoincrement().primaryKey(),
+  circleId: int("circleId").notNull().references(() => circles.id, { onDelete: "cascade" }),
+  uploaderId: int("uploaderId").notNull().references(() => users.id, { onDelete: "cascade" }),
+  filename: varchar("filename", { length: 500 }).notNull(),
+  fileKey: varchar("fileKey", { length: 500 }).notNull(),
+  fileUrl: text("fileUrl").notNull(),
+  mimeType: varchar("mimeType", { length: 100 }).notNull(),
+  fileSize: bigint("fileSize", { mode: "number" }).notNull(),
+  fileType: mysqlEnum("fileType", ["video", "audio", "image"]).notNull(),
+  uploadedAt: timestamp("uploadedAt").defaultNow().notNull(),
+}, (table) => ({
+  circleIdx: index("circle_idx").on(table.circleId),
+  uploaderIdx: index("uploader_idx").on(table.uploaderId),
+  typeIdx: index("type_idx").on(table.fileType),
+}));
+
+export type File = typeof files.$inferSelect;
+export type InsertFile = typeof files.$inferInsert;

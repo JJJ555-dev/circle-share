@@ -1,11 +1,10 @@
-import { eq } from "drizzle-orm";
+import { eq, and, desc, sql } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/mysql2";
-import { InsertUser, users } from "../drizzle/schema";
+import { InsertUser, users, circles, circleMembers, files, InsertCircle, InsertCircleMember, InsertFile, User } from "../drizzle/schema";
 import { ENV } from './_core/env';
 
 let _db: ReturnType<typeof drizzle> | null = null;
 
-// Lazily create the drizzle instance so local tooling can run without a DB.
 export async function getDb() {
   if (!_db && process.env.DATABASE_URL) {
     try {
@@ -18,7 +17,7 @@ export async function getDb() {
   return _db;
 }
 
-export async function upsertUser(user: InsertUser): Promise<void> {
+export async function upsertUser(user: InsertUser): Promise<User | undefined> {
   if (!user.openId) {
     throw new Error("User openId is required for upsert");
   }
@@ -71,6 +70,8 @@ export async function upsertUser(user: InsertUser): Promise<void> {
     await db.insert(users).values(values).onDuplicateKeyUpdate({
       set: updateSet,
     });
+    
+    return await getUserByOpenId(user.openId);
   } catch (error) {
     console.error("[Database] Failed to upsert user:", error);
     throw error;
@@ -89,4 +90,183 @@ export async function getUserByOpenId(openId: string) {
   return result.length > 0 ? result[0] : undefined;
 }
 
-// TODO: add feature queries here as your schema grows.
+// Circle queries
+export async function createCircle(data: InsertCircle) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  
+  const result = await db.insert(circles).values(data);
+  return result[0].insertId;
+}
+
+export async function getCircleById(circleId: number) {
+  const db = await getDb();
+  if (!db) return undefined;
+  
+  const result = await db.select().from(circles).where(eq(circles.id, circleId)).limit(1);
+  return result.length > 0 ? result[0] : undefined;
+}
+
+export async function getCirclesByUserId(userId: number) {
+  const db = await getDb();
+  if (!db) return [];
+  
+  const result = await db
+    .select({
+      id: circles.id,
+      name: circles.name,
+      description: circles.description,
+      creatorId: circles.creatorId,
+      createdAt: circles.createdAt,
+      updatedAt: circles.updatedAt,
+      role: circleMembers.role,
+      memberCount: sql<number>`(SELECT COUNT(*) FROM ${circleMembers} WHERE ${circleMembers.circleId} = ${circles.id})`,
+    })
+    .from(circleMembers)
+    .innerJoin(circles, eq(circleMembers.circleId, circles.id))
+    .where(eq(circleMembers.userId, userId))
+    .orderBy(desc(circles.updatedAt));
+  
+  return result;
+}
+
+export async function updateCircle(circleId: number, data: Partial<InsertCircle>) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  
+  await db.update(circles).set(data).where(eq(circles.id, circleId));
+}
+
+export async function deleteCircle(circleId: number) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  
+  await db.delete(circles).where(eq(circles.id, circleId));
+}
+
+// Circle member queries
+export async function addCircleMember(data: InsertCircleMember) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  
+  const result = await db.insert(circleMembers).values(data);
+  return result[0].insertId;
+}
+
+export async function getCircleMember(circleId: number, userId: number) {
+  const db = await getDb();
+  if (!db) return undefined;
+  
+  const result = await db
+    .select()
+    .from(circleMembers)
+    .where(and(eq(circleMembers.circleId, circleId), eq(circleMembers.userId, userId)))
+    .limit(1);
+  
+  return result.length > 0 ? result[0] : undefined;
+}
+
+export async function getCircleMembers(circleId: number) {
+  const db = await getDb();
+  if (!db) return [];
+  
+  const result = await db
+    .select({
+      id: circleMembers.id,
+      circleId: circleMembers.circleId,
+      userId: circleMembers.userId,
+      role: circleMembers.role,
+      joinedAt: circleMembers.joinedAt,
+      userName: users.name,
+      userEmail: users.email,
+    })
+    .from(circleMembers)
+    .innerJoin(users, eq(circleMembers.userId, users.id))
+    .where(eq(circleMembers.circleId, circleId))
+    .orderBy(desc(circleMembers.joinedAt));
+  
+  return result;
+}
+
+export async function removeCircleMember(circleId: number, userId: number) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  
+  await db.delete(circleMembers).where(and(eq(circleMembers.circleId, circleId), eq(circleMembers.userId, userId)));
+}
+
+// File queries
+export async function createFile(data: InsertFile) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  
+  const result = await db.insert(files).values(data);
+  return result[0].insertId;
+}
+
+export async function getFileById(fileId: number) {
+  const db = await getDb();
+  if (!db) return undefined;
+  
+  const result = await db.select().from(files).where(eq(files.id, fileId)).limit(1);
+  return result.length > 0 ? result[0] : undefined;
+}
+
+export async function getFilesByCircleId(circleId: number) {
+  const db = await getDb();
+  if (!db) return [];
+  
+  const result = await db
+    .select({
+      id: files.id,
+      circleId: files.circleId,
+      uploaderId: files.uploaderId,
+      filename: files.filename,
+      fileKey: files.fileKey,
+      fileUrl: files.fileUrl,
+      mimeType: files.mimeType,
+      fileSize: files.fileSize,
+      fileType: files.fileType,
+      uploadedAt: files.uploadedAt,
+      uploaderName: users.name,
+    })
+    .from(files)
+    .innerJoin(users, eq(files.uploaderId, users.id))
+    .where(eq(files.circleId, circleId))
+    .orderBy(desc(files.uploadedAt));
+  
+  return result;
+}
+
+export async function getFilesByUserId(userId: number) {
+  const db = await getDb();
+  if (!db) return [];
+  
+  const result = await db
+    .select({
+      id: files.id,
+      circleId: files.circleId,
+      uploaderId: files.uploaderId,
+      filename: files.filename,
+      fileKey: files.fileKey,
+      fileUrl: files.fileUrl,
+      mimeType: files.mimeType,
+      fileSize: files.fileSize,
+      fileType: files.fileType,
+      uploadedAt: files.uploadedAt,
+      circleName: circles.name,
+    })
+    .from(files)
+    .innerJoin(circles, eq(files.circleId, circles.id))
+    .where(eq(files.uploaderId, userId))
+    .orderBy(desc(files.uploadedAt));
+  
+  return result;
+}
+
+export async function deleteFile(fileId: number) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  
+  await db.delete(files).where(eq(files.id, fileId));
+}
