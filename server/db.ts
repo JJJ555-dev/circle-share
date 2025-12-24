@@ -356,3 +356,38 @@ export async function getFilesByFolderId(folderId: number) {
   
   return result;
 }
+
+
+export async function getPublicCircles() {
+  const db = await getDb();
+  if (!db) return [];
+  
+  const result = await db
+    .select({
+      id: circles.id,
+      name: circles.name,
+      description: circles.description,
+      creatorId: circles.creatorId,
+      createdAt: circles.createdAt,
+      updatedAt: circles.updatedAt,
+      memberCount: sql<number>`(SELECT COUNT(*) FROM ${circleMembers} WHERE ${circleMembers.circleId} = ${circles.id})`,
+    })
+    .from(circles)
+    .where(eq(circles.isPublic, 1))
+    .orderBy(desc(circles.updatedAt));
+  
+  return result;
+}
+
+export async function getCircleByInvitationCode(code: string) {
+  const db = await getDb();
+  if (!db) return undefined;
+  
+  const result = await db
+    .select()
+    .from(circles)
+    .where(eq(circles.invitationCode, code))
+    .limit(1);
+  
+  return result.length > 0 ? result[0] : undefined;
+}

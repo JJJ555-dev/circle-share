@@ -17,8 +17,22 @@ export default function Circles() {
   const [open, setOpen] = useState(false);
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
+  const [isPublic, setIsPublic] = useState(true);
+  const [invitationCode, setInvitationCode] = useState("");
+  const [showPublicCircles, setShowPublicCircles] = useState(false);
 
   const { data: circles, isLoading, refetch } = trpc.circles.list.useQuery();
+  const { data: publicCircles, isLoading: publicLoading } = trpc.circles.listPublic.useQuery();
+  const joinMutation = trpc.circles.joinByInvitationCode.useMutation({
+    onSuccess: (data) => {
+      toast.success("加入圈子成功");
+      setInvitationCode("");
+      refetch();
+    },
+    onError: (error) => {
+      toast.error(error.message || "加入失败");
+    },
+  });
   const createMutation = trpc.circles.create.useMutation({
     onSuccess: () => {
       toast.success("圈子创建成功");
@@ -42,7 +56,15 @@ export default function Circles() {
       toast.error("请输入圈子名称");
       return;
     }
-    createMutation.mutate({ name, description });
+    createMutation.mutate({ name, description, isPublic });
+  };
+
+  const handleJoinByCode = () => {
+    if (!invitationCode.trim()) {
+      toast.error("请输入邀请码");
+      return;
+    }
+    joinMutation.mutate({ code: invitationCode });
   };
 
   return (
@@ -52,7 +74,7 @@ export default function Circles() {
           <Link href="/">
             <div className="flex items-center gap-2 cursor-pointer">
               <Circle className="w-6 h-6 text-primary" />
-              <span className="text-xl font-semibold">圈子分享</span>
+              <span className="text-xl font-semibold">融媒</span>
             </div>
           </Link>
           <div className="flex items-center gap-4">
@@ -105,6 +127,19 @@ export default function Circles() {
                     rows={3}
                   />
                 </div>
+                <div className="space-y-2">
+                  <Label className="flex items-center gap-2">
+                    <input
+                      type="checkbox"
+                      checked={isPublic}
+                      onChange={(e) => setIsPublic(e.target.checked)}
+                    />
+                    公开圈子（所有人可以看到）
+                  </Label>
+                  {!isPublic && (
+                    <p className="text-sm text-muted-foreground">邀请码将自动生成，用于邀请成员加入</p>
+                  )}
+                </div>
               </div>
               <DialogFooter>
                 <Button variant="outline" onClick={() => setOpen(false)}>
@@ -117,6 +152,67 @@ export default function Circles() {
             </DialogContent>
           </Dialog>
         </div>
+
+        <div className="mb-8 p-6 bg-card rounded-lg border">
+          <h2 className="text-lg font-semibold mb-4">使用邀请码加入圈子</h2>
+          <div className="flex gap-2">
+            <Input
+              placeholder="输入邀请码"
+              value={invitationCode}
+              onChange={(e) => setInvitationCode(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") {
+                  handleJoinByCode();
+                }
+              }}
+            />
+            <Button onClick={handleJoinByCode} disabled={joinMutation.isPending}>
+              {joinMutation.isPending ? "加入中..." : "加入"}
+            </Button>
+          </div>
+        </div>
+
+        {showPublicCircles && (
+          <div className="mb-12">
+            <h2 className="text-2xl font-bold mb-6">发现圈子</h2>
+            {publicLoading ? (
+              <div className="text-center py-12 text-muted-foreground">加载中...</div>
+            ) : publicCircles && publicCircles.length > 0 ? (
+              <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
+                {publicCircles.map((circle) => (
+                  <Card key={circle.id} className="hover:shadow-lg transition-all hover:border-primary/50">
+                    <CardHeader>
+                      <div className="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center mb-2">
+                        <Circle className="w-6 h-6 text-primary" />
+                      </div>
+                      <CardTitle className="text-xl">{circle.name}</CardTitle>
+                      <CardDescription className="line-clamp-2">
+                        {circle.description || "暂无描述"}
+                      </CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="flex items-center gap-4 text-sm text-muted-foreground mb-4">
+                        <div className="flex items-center gap-1">
+                          <Users className="w-4 h-4" />
+                          <span>{circle.memberCount} 成员</span>
+                        </div>
+                      </div>
+                      <Link href={`/circles/${circle.id}`}>
+                        <Button className="w-full">查看详情</Button>
+                      </Link>
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
+            ) : (
+              <Card className="text-center py-16">
+                <CardContent>
+                  <p className="text-muted-foreground">暂无公开圈子</p>
+                </CardContent>
+              </Card>
+            )}
+          </div>
+        )}
 
         {isLoading ? (
           <div className="text-center py-12 text-muted-foreground">加载中...</div>

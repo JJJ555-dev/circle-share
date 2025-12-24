@@ -26,12 +26,24 @@ export const appRouter = router({
       .input(z.object({
         name: z.string().min(1).max(255),
         description: z.string().optional(),
+        isPublic: z.boolean().default(true),
       }))
       .mutation(async ({ ctx, input }) => {
+        let invitationCode = null;
+        if (!input.isPublic) {
+          // Generate a unique 8-character invitation code
+          const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+          invitationCode = Array.from({ length: 8 }, () => 
+            chars.charAt(Math.floor(Math.random() * chars.length))
+          ).join('');
+        }
+
         const circleId = await db.createCircle({
           name: input.name,
           description: input.description || null,
           creatorId: ctx.user.id,
+          isPublic: input.isPublic ? 1 : 0,
+          invitationCode,
         });
 
         await db.addCircleMember({
@@ -46,6 +58,42 @@ export const appRouter = router({
     list: protectedProcedure.query(async ({ ctx }) => {
       return await db.getCirclesByUserId(ctx.user.id);
     }),
+
+    listPublic: publicProcedure.query(async () => {
+      return await db.getPublicCircles();
+    }),
+
+    searchByInvitationCode: protectedProcedure
+      .input(z.object({ code: z.string().min(1).max(64) }))
+      .query(async ({ ctx, input }) => {
+        const circle = await db.getCircleByInvitationCode(input.code);
+        if (!circle) {
+          throw new TRPCError({ code: "NOT_FOUND", message: "Invalid invitation code" });
+        }
+        return circle;
+      }),
+
+    joinByInvitationCode: protectedProcedure
+      .input(z.object({ code: z.string().min(1).max(64) }))
+      .mutation(async ({ ctx, input }) => {
+        const circle = await db.getCircleByInvitationCode(input.code);
+        if (!circle) {
+          throw new TRPCError({ code: "NOT_FOUND", message: "Invalid invitation code" });
+        }
+
+        const existingMember = await db.getCircleMember(circle.id, ctx.user.id);
+        if (existingMember) {
+          throw new TRPCError({ code: "BAD_REQUEST", message: "Already a member of this circle" });
+        }
+
+        await db.addCircleMember({
+          circleId: circle.id,
+          userId: ctx.user.id,
+          role: "member",
+        });
+
+        return { circleId: circle.id };
+      }),
 
     get: protectedProcedure
       .input(z.object({ circleId: z.number() }))

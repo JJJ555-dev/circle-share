@@ -22,6 +22,13 @@
       "when": 1766318380085,
       "tag": "0002_charming_preak",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "5",
+      "when": 1766318970236,
+      "tag": "0003_brief_tomorrow_man",
+      "breakpoints": true
     }
   ]
 }

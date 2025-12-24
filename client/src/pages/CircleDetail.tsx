@@ -4,7 +4,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { trpc } from "@/lib/trpc";
-import { Upload, Download, Users, Trash2, FileVideo, FileAudio, FileImage, Crown, UserMinus, ArrowLeft, Eye } from "lucide-react";
+import { Upload, Download, Users, Trash2, FileVideo, FileAudio, FileImage, Crown, UserMinus, ArrowLeft, Eye, Circle } from "lucide-react";
 import { useState, useRef } from "react";
 import { Link, useLocation, useParams } from "wouter";
 import { toast } from "sonner";
@@ -173,8 +173,8 @@ export default function CircleDetail() {
         <div className="container py-4 flex items-center justify-between">
           <Link href="/">
             <div className="flex items-center gap-2 cursor-pointer">
-              <ArrowLeft className="w-5 h-5" />
-              <span className="text-lg font-semibold">返回</span>
+              <Circle className="w-6 h-6 text-primary" />
+              <span className="text-xl font-semibold">融媒</span>
             </div>
           </Link>
           <div className="flex items-center gap-4">

@@ -1,4 +1,4 @@
-import { int, mysqlEnum, mysqlTable, text, timestamp, varchar, bigint, index } from "drizzle-orm/mysql-core";
+import { int, mysqlEnum, mysqlTable, text, timestamp, varchar, index, tinyint, bigint } from "drizzle-orm/mysql-core";
 
 /**
  * Core user table backing auth flow.
@@ -26,10 +26,13 @@ export const circles = mysqlTable("circles", {
   name: varchar("name", { length: 255 }).notNull(),
   description: text("description"),
   creatorId: int("creatorId").notNull().references(() => users.id, { onDelete: "cascade" }),
+  isPublic: tinyint("isPublic").default(1).notNull(),
+  invitationCode: varchar("invitationCode", { length: 64 }).unique(),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
 }, (table) => ({
   creatorIdx: index("creator_idx").on(table.creatorId),
+  invitationCodeIdx: index("invitation_code_idx").on(table.invitationCode),
 }));
 
 export type Circle = typeof circles.$inferSelect;

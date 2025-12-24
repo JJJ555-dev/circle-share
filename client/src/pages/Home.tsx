@@ -23,7 +23,7 @@ export default function Home() {
           <div className="container py-4 flex items-center justify-between">
             <div className="flex items-center gap-2">
               <Circle className="w-6 h-6 text-primary" />
-              <span className="text-xl font-semibold">圈子分享</span>
+              <span className="text-xl font-semibold">融媒</span>
             </div>
             <div className="flex items-center gap-4">
               <Link href="/circles">
@@ -109,7 +109,7 @@ export default function Home() {
         <div className="container py-4 flex items-center justify-between">
           <div className="flex items-center gap-2">
             <Circle className="w-6 h-6 text-primary" />
-            <span className="text-xl font-semibold">圈子分享</span>
+            <span className="text-xl font-semibold">融媒</span>
           </div>
           <Button asChild>
             <a href={getLoginUrl()}>登录</a>

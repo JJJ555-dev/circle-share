@@ -47,8 +47,8 @@ export default function Profile() {
         <div className="container py-4 flex items-center justify-between">
           <Link href="/">
             <div className="flex items-center gap-2 cursor-pointer">
-              <ArrowLeft className="w-5 h-5" />
-              <span className="text-lg font-semibold">返回</span>
+              <Circle className="w-6 h-6 text-primary" />
+              <span className="text-xl font-semibold">融媒</span>
             </div>
           </Link>
           <div className="flex items-center gap-4">
