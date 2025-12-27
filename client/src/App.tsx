@@ -8,11 +8,13 @@ import Home from "./pages/Home";
 import Circles from "./pages/Circles";
 import CircleDetail from "./pages/CircleDetail";
 import Profile from "./pages/Profile";
+import DiscoverCircles from "./pages/DiscoverCircles";
 
 function Router() {
   return (
     <Switch>
       <Route path={"/"} component={Home} />
+      <Route path={"/discover"} component={DiscoverCircles} />
       <Route path={"/circles"} component={Circles} />
       <Route path={"/circles/:id"} component={CircleDetail} />
       <Route path={"/profile"} component={Profile} />

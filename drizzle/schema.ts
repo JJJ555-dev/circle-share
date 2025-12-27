@@ -99,3 +99,62 @@ export const files = mysqlTable("files", {
 
 export type File = typeof files.$inferSelect;
 export type InsertFile = typeof files.$inferInsert;
+
+
+/**
+ * File share links table - for sharing files with temporary links
+ */
+export const fileShareLinks = mysqlTable("file_share_links", {
+  id: int("id").autoincrement().primaryKey(),
+  fileId: int("fileId").notNull().references(() => files.id, { onDelete: "cascade" }),
+  token: varchar("token", { length: 64 }).notNull().unique(),
+  createdBy: int("createdBy").notNull().references(() => users.id, { onDelete: "cascade" }),
+  expiresAt: timestamp("expiresAt"),
+  downloadCount: int("downloadCount").default(0),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+}, (table) => ({
+  fileIdx: index("file_idx").on(table.fileId),
+  tokenIdx: index("token_idx").on(table.token),
+  expiresIdx: index("expires_idx").on(table.expiresAt),
+}));
+
+export type FileShareLink = typeof fileShareLinks.$inferSelect;
+export type InsertFileShareLink = typeof fileShareLinks.$inferInsert;
+
+/**
+ * Circle activity logs table - tracks actions within circles
+ */
+export const circleActivityLogs = mysqlTable("circle_activity_logs", {
+  id: int("id").autoincrement().primaryKey(),
+  circleId: int("circleId").notNull().references(() => circles.id, { onDelete: "cascade" }),
+  userId: int("userId").notNull().references(() => users.id, { onDelete: "set null" }),
+  action: mysqlEnum("action", ["member_joined", "member_left", "member_removed", "file_uploaded", "file_deleted", "folder_created", "folder_deleted", "circle_updated"]).notNull(),
+  targetId: int("targetId"),
+  targetType: mysqlEnum("targetType", ["member", "file", "folder"]),
+  description: text("description"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+}, (table) => ({
+  circleIdx: index("circle_activity_idx").on(table.circleId),
+  userIdx: index("user_activity_idx").on(table.userId),
+  actionIdx: index("action_idx").on(table.action),
+  createdIdx: index("created_activity_idx").on(table.createdAt),
+}));
+
+export type CircleActivityLog = typeof circleActivityLogs.$inferSelect;
+export type InsertCircleActivityLog = typeof circleActivityLogs.$inferInsert;
+
+/**
+ * Circle categories/tags table - for organizing circles
+ */
+export const circleCategories = mysqlTable("circle_categories", {
+  id: int("id").autoincrement().primaryKey(),
+  circleId: int("circleId").notNull().references(() => circles.id, { onDelete: "cascade" }),
+  category: varchar("category", { length: 50 }).notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+}, (table) => ({
+  circleIdx: index("circle_category_idx").on(table.circleId),
+  categoryIdx: index("category_idx").on(table.category),
+}));
+
+export type CircleCategory = typeof circleCategories.$inferSelect;
+export type InsertCircleCategory = typeof circleCategories.$inferInsert;

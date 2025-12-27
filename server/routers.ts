@@ -387,6 +387,131 @@ export const appRouter = router({
         return { success: true };
       }),
   }),
+
+  search: router({
+    circles: publicProcedure
+      .input(z.object({
+        query: z.string().min(1),
+      }))
+      .query(async ({ input }) => {
+        return await db.searchCirclesByName(input.query);
+      }),
+    
+    byCategory: publicProcedure
+      .input(z.object({
+        category: z.string().min(1),
+      }))
+      .query(async ({ input }) => {
+        return await db.searchCirclesByCategory(input.category);
+      }),
+  }),
+
+  fileShare: router({
+    createLink: protectedProcedure
+      .input(z.object({
+        fileId: z.number(),
+        expiresAt: z.date().optional(),
+      }))
+      .mutation(async ({ ctx, input }) => {
+        const file = await db.getFileById(input.fileId);
+        if (!file) {
+          throw new TRPCError({ code: "NOT_FOUND", message: "File not found" });
+        }
+
+        const member = await db.getCircleMember(file.circleId, ctx.user.id);
+        if (!member) {
+          throw new TRPCError({ code: "FORBIDDEN", message: "Not a member of this circle" });
+        }
+
+        const token = nanoid(32);
+        const linkId = await db.createFileShareLink({
+          fileId: input.fileId,
+          token,
+          createdBy: ctx.user.id,
+          expiresAt: input.expiresAt || null,
+        });
+
+        return { linkId, token };
+      }),
+
+    getByToken: publicProcedure
+      .input(z.object({
+        token: z.string(),
+      }))
+      .query(async ({ input }) => {
+        const link = await db.getFileShareLinkByToken(input.token);
+        if (!link) {
+          throw new TRPCError({ code: "NOT_FOUND", message: "Share link not found" });
+        }
+
+        if (link.expiresAt && new Date(link.expiresAt) < new Date()) {
+          throw new TRPCError({ code: "BAD_REQUEST", message: "Share link has expired" });
+        }
+
+        const file = await db.getFileById(link.fileId);
+        return { file, link };
+      }),
+
+    deleteLink: protectedProcedure
+      .input(z.object({
+        linkId: z.number(),
+      }))
+      .mutation(async ({ ctx, input }) => {
+        await db.deleteFileShareLink(input.linkId);
+        return { success: true };
+      }),
+  }),
+
+  activity: router({
+    getCircleActivity: publicProcedure
+      .input(z.object({
+        circleId: z.number(),
+        limit: z.number().default(50),
+      }))
+      .query(async ({ input }) => {
+        return await db.getActivityLogsByCircleId(input.circleId, input.limit);
+      }),
+  }),
+
+  categories: router({
+    add: protectedProcedure
+      .input(z.object({
+        circleId: z.number(),
+        category: z.string().min(1).max(50),
+      }))
+      .mutation(async ({ ctx, input }) => {
+        const member = await db.getCircleMember(input.circleId, ctx.user.id);
+        if (!member) {
+          throw new TRPCError({ code: "FORBIDDEN", message: "Not a member of this circle" });
+        }
+
+        await db.addCircleCategory(input.circleId, input.category);
+        return { success: true };
+      }),
+
+    getByCircle: publicProcedure
+      .input(z.object({
+        circleId: z.number(),
+      }))
+      .query(async ({ input }) => {
+        return await db.getCategoriesByCircleId(input.circleId);
+      }),
+
+    remove: protectedProcedure
+      .input(z.object({
+        circleId: z.number(),
+        category: z.string(),
+      }))
+      .mutation(async ({ ctx, input }) => {
+        const member = await db.getCircleMember(input.circleId, ctx.user.id);
+        if (!member) {
+          throw new TRPCError({ code: "FORBIDDEN", message: "Not a member of this circle" });
+        }
+
+        await db.removeCircleCategory(input.circleId, input.category);
+        return { success: true };
+      }),
+  }),
 });
 
 export type AppRouter = typeof appRouter;

@@ -26,6 +26,9 @@ export default function Home() {
               <span className="text-xl font-semibold">融媒</span>
             </div>
             <div className="flex items-center gap-4">
+              <Link href="/discover">
+                <Button variant="ghost">发现圈子</Button>
+              </Link>
               <Link href="/circles">
                 <Button variant="ghost">我的圈子</Button>
               </Link>
@@ -46,16 +49,16 @@ export default function Home() {
               在圈子中分享您的珍贵文件，与成员无损共享视频、音频和图片
             </p>
             <div className="flex gap-4 justify-center">
-              <Link href="/circles">
+              <Link href="/discover">
                 <Button size="lg" className="gap-2">
-                  <Circle className="w-5 h-5" />
-                  查看我的圈子
+                  <Sparkles className="w-5 h-5" />
+                  发现圈子
                 </Button>
               </Link>
-              <Link href="/circles/new">
+              <Link href="/circles">
                 <Button size="lg" variant="outline" className="gap-2">
-                  <Sparkles className="w-5 h-5" />
-                  创建新圈子
+                  <Circle className="w-5 h-5" />
+                  我的圈子
                 </Button>
               </Link>
             </div>

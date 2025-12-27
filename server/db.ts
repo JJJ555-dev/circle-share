@@ -1,8 +1,7 @@
-import { eq, and, desc, sql } from "drizzle-orm";
+import { eq, desc, sql, and } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/mysql2";
 import { InsertUser, users, circles, circleMembers, files, folders, InsertCircle, InsertCircleMember, InsertFile, User } from "../drizzle/schema";
 import { ENV } from './_core/env';
-
 let _db: ReturnType<typeof drizzle> | null = null;
 
 export async function getDb() {
@@ -390,4 +389,171 @@ export async function getCircleByInvitationCode(code: string) {
     .limit(1);
   
   return result.length > 0 ? result[0] : undefined;
+}
+
+
+// File share links functions
+export async function createFileShareLink(data: any): Promise<number> {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  
+  const { fileShareLinks } = await import("../drizzle/schema");
+  const result = await db.insert(fileShareLinks).values(data);
+  return result[0].insertId;
+}
+
+export async function getFileShareLinkByToken(token: string) {
+  const db = await getDb();
+  if (!db) return undefined;
+  
+  const { fileShareLinks } = await import("../drizzle/schema");
+  const result = await db
+    .select()
+    .from(fileShareLinks)
+    .where(eq(fileShareLinks.token, token))
+    .limit(1);
+  
+  return result.length > 0 ? result[0] : undefined;
+}
+
+export async function getFileShareLinksByFileId(fileId: number) {
+  const db = await getDb();
+  if (!db) return [];
+  
+  const { fileShareLinks } = await import("../drizzle/schema");
+  const result = await db
+    .select()
+    .from(fileShareLinks)
+    .where(eq(fileShareLinks.fileId, fileId))
+    .orderBy(desc(fileShareLinks.createdAt));
+  
+  return result;
+}
+
+export async function updateFileShareLinkDownloadCount(linkId: number) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  
+  const { fileShareLinks } = await import("../drizzle/schema");
+  await db
+    .update(fileShareLinks)
+    .set({ downloadCount: sql`${fileShareLinks.downloadCount} + 1` })
+    .where(eq(fileShareLinks.id, linkId));
+}
+
+export async function deleteFileShareLink(linkId: number) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  
+  const { fileShareLinks } = await import("../drizzle/schema");
+  await db.delete(fileShareLinks).where(eq(fileShareLinks.id, linkId));
+}
+
+// Circle activity logs functions
+export async function createActivityLog(data: any) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  
+  const { circleActivityLogs } = await import("../drizzle/schema");
+  await db.insert(circleActivityLogs).values(data);
+}
+
+export async function getActivityLogsByCircleId(circleId: number, limit: number = 50) {
+  const db = await getDb();
+  if (!db) return [];
+  
+  const { circleActivityLogs } = await import("../drizzle/schema");
+  const result = await db
+    .select({
+      id: circleActivityLogs.id,
+      circleId: circleActivityLogs.circleId,
+      userId: circleActivityLogs.userId,
+      action: circleActivityLogs.action,
+      targetId: circleActivityLogs.targetId,
+      targetType: circleActivityLogs.targetType,
+      description: circleActivityLogs.description,
+      createdAt: circleActivityLogs.createdAt,
+      userName: users.name,
+    })
+    .from(circleActivityLogs)
+    .leftJoin(users, eq(circleActivityLogs.userId, users.id))
+    .where(eq(circleActivityLogs.circleId, circleId))
+    .orderBy(desc(circleActivityLogs.createdAt))
+    .limit(limit);
+  
+  return result;
+}
+
+// Circle categories functions
+export async function addCircleCategory(circleId: number, category: string) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  
+  const { circleCategories } = await import("../drizzle/schema");
+  await db.insert(circleCategories).values({ circleId, category });
+}
+
+export async function getCategoriesByCircleId(circleId: number) {
+  const db = await getDb();
+  if (!db) return [];
+  
+  const { circleCategories } = await import("../drizzle/schema");
+  const result = await db
+    .select({ category: circleCategories.category })
+    .from(circleCategories)
+    .where(eq(circleCategories.circleId, circleId));
+  
+  return result.map(r => r.category);
+}
+
+export async function removeCircleCategory(circleId: number, category: string) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  
+  const { circleCategories } = await import("../drizzle/schema");
+  await db
+    .delete(circleCategories)
+    .where(and(eq(circleCategories.circleId, circleId), eq(circleCategories.category, category)));
+}
+
+export async function searchCirclesByCategory(category: string) {
+  const db = await getDb();
+  if (!db) return [];
+  
+  const { circleCategories } = await import("../drizzle/schema");
+  const result = await db
+    .select({
+      id: circles.id,
+      name: circles.name,
+      description: circles.description,
+      creatorId: circles.creatorId,
+      createdAt: circles.createdAt,
+      memberCount: sql<number>`(SELECT COUNT(*) FROM ${circleMembers} WHERE ${circleMembers.circleId} = ${circles.id})`,
+    })
+    .from(circleCategories)
+    .innerJoin(circles, eq(circleCategories.circleId, circles.id))
+    .where(and(eq(circleCategories.category, category), eq(circles.isPublic, 1)))
+    .orderBy(desc(circles.updatedAt));
+  
+  return result;
+}
+
+export async function searchCirclesByName(searchTerm: string) {
+  const db = await getDb();
+  if (!db) return [];
+  
+  const result = await db
+    .select({
+      id: circles.id,
+      name: circles.name,
+      description: circles.description,
+      creatorId: circles.creatorId,
+      createdAt: circles.createdAt,
+      memberCount: sql<number>`(SELECT COUNT(*) FROM ${circleMembers} WHERE ${circleMembers.circleId} = ${circles.id})`,
+    })
+    .from(circles)
+    .where(and(sql`${circles.name} LIKE ${`%${searchTerm}%`}`, eq(circles.isPublic, 1)))
+    .orderBy(desc(circles.updatedAt));
+  
+  return result;
 }
