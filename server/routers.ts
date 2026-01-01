@@ -511,7 +511,109 @@ export const appRouter = router({
         await db.removeCircleCategory(input.circleId, input.category);
         return { success: true };
       }),
+   }),
+  admin: router({
+    getAnnouncements: protectedProcedure
+      .input(z.object({
+        limit: z.number().default(20),
+        offset: z.number().default(0),
+      }))
+      .query(async ({ ctx, input }) => {
+        if (ctx.user?.role !== "admin") {
+          throw new TRPCError({ code: "FORBIDDEN", message: "Admin access required" });
+        }
+        return await db.getAnnouncements(input.limit, input.offset);
+      }),
+    createAnnouncement: protectedProcedure
+      .input(z.object({
+        title: z.string().min(1).max(255),
+        content: z.string().min(1),
+      }))
+      .mutation(async ({ ctx, input }) => {
+        if (ctx.user?.role !== "admin") {
+          throw new TRPCError({ code: "FORBIDDEN", message: "Admin access required" });
+        }
+        await db.createAnnouncement({
+          title: input.title,
+          content: input.content,
+          createdBy: ctx.user.id,
+          isPublished: 0,
+        });
+        return { success: true };
+      }),
+    publishAnnouncement: protectedProcedure
+      .input(z.object({
+        id: z.number(),
+      }))
+      .mutation(async ({ ctx, input }) => {
+        if (ctx.user?.role !== "admin") {
+          throw new TRPCError({ code: "FORBIDDEN", message: "Admin access required" });
+        }
+        await db.publishAnnouncement(input.id);
+        await db.logAdminAction({
+          adminId: ctx.user.id,
+          action: "announcement_published",
+          details: `Published announcement ${input.id}`,
+        });
+        return { success: true };
+      }),
+    deleteAnnouncement: protectedProcedure
+      .input(z.object({
+        id: z.number(),
+      }))
+      .mutation(async ({ ctx, input }) => {
+        if (ctx.user?.role !== "admin") {
+          throw new TRPCError({ code: "FORBIDDEN", message: "Admin access required" });
+        }
+        await db.deleteAnnouncement(input.id);
+        await db.logAdminAction({
+          adminId: ctx.user.id,
+          action: "announcement_deleted",
+          details: `Deleted announcement ${input.id}`,
+        });
+        return { success: true };
+      }),
+    getAllUsers: protectedProcedure
+      .input(z.object({
+        limit: z.number().default(50),
+        offset: z.number().default(0),
+      }))
+      .query(async ({ ctx, input }) => {
+        if (ctx.user?.role !== "admin") {
+          throw new TRPCError({ code: "FORBIDDEN", message: "Admin access required" });
+        }
+        return await db.getAllUsers(input.limit, input.offset);
+      }),
+    disableUser: protectedProcedure
+      .input(z.object({
+        userId: z.number(),
+      }))
+      .mutation(async ({ ctx, input }) => {
+        if (ctx.user?.role !== "admin") {
+          throw new TRPCError({ code: "FORBIDDEN", message: "Admin access required" });
+        }
+        if (input.userId === ctx.user.id) {
+          throw new TRPCError({ code: "BAD_REQUEST", message: "Cannot disable yourself" });
+        }
+        await db.disableUser(input.userId);
+        await db.logAdminAction({
+          adminId: ctx.user.id,
+          action: "user_disabled",
+          targetUserId: input.userId,
+        });
+        return { success: true };
+      }),
+    getAdminLogs: protectedProcedure
+      .input(z.object({
+        limit: z.number().default(50),
+        offset: z.number().default(0),
+      }))
+      .query(async ({ ctx, input }) => {
+        if (ctx.user?.role !== "admin") {
+          throw new TRPCError({ code: "FORBIDDEN", message: "Admin access required" });
+        }
+        return await db.getAdminLogs(input.limit, input.offset);
+      }),
   }),
 });
-
 export type AppRouter = typeof appRouter;

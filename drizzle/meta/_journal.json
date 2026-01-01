@@ -36,6 +36,13 @@
       "when": 1766583682193,
       "tag": "0004_cooing_jackpot",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "5",
+      "when": 1766824621336,
+      "tag": "0005_lumpy_demogoblin",
+      "breakpoints": true
     }
   ]
 }

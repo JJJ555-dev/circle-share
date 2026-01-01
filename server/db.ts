@@ -1,6 +1,6 @@
 import { eq, desc, sql, and } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/mysql2";
-import { InsertUser, users, circles, circleMembers, files, folders, InsertCircle, InsertCircleMember, InsertFile, User } from "../drizzle/schema";
+import { InsertUser, users, circles, circleMembers, files, folders, announcements, adminLogs, siteStats, InsertCircle, InsertCircleMember, InsertFile, User, InsertAnnouncement, InsertAdminLog, InsertSiteStat } from "../drizzle/schema";
 import { ENV } from './_core/env';
 let _db: ReturnType<typeof drizzle> | null = null;
 
@@ -556,4 +556,160 @@ export async function searchCirclesByName(searchTerm: string) {
     .orderBy(desc(circles.updatedAt));
   
   return result;
+}
+
+
+// ==================== Admin Management Functions ====================
+
+export async function createAnnouncement(data: InsertAnnouncement) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  
+  const result = await db.insert(announcements).values(data);
+  return result;
+}
+
+export async function getAnnouncements(limit = 20, offset = 0) {
+  const db = await getDb();
+  if (!db) return [];
+  
+  const result = await db
+    .select({
+      id: announcements.id,
+      title: announcements.title,
+      content: announcements.content,
+      createdBy: announcements.createdBy,
+      isPublished: announcements.isPublished,
+      publishedAt: announcements.publishedAt,
+      createdAt: announcements.createdAt,
+      updatedAt: announcements.updatedAt,
+    })
+    .from(announcements)
+    .orderBy(desc(announcements.publishedAt), desc(announcements.createdAt))
+    .limit(limit)
+    .offset(offset);
+  
+  return result;
+}
+
+export async function getPublishedAnnouncements(limit = 10) {
+  const db = await getDb();
+  if (!db) return [];
+  
+  const result = await db
+    .select({
+      id: announcements.id,
+      title: announcements.title,
+      content: announcements.content,
+      publishedAt: announcements.publishedAt,
+    })
+    .from(announcements)
+    .where(eq(announcements.isPublished, 1))
+    .orderBy(desc(announcements.publishedAt))
+    .limit(limit);
+  
+  return result;
+}
+
+export async function updateAnnouncement(id: number, data: Partial<InsertAnnouncement>) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  
+  await db.update(announcements).set(data).where(eq(announcements.id, id));
+}
+
+export async function deleteAnnouncement(id: number) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  
+  await db.delete(announcements).where(eq(announcements.id, id));
+}
+
+export async function publishAnnouncement(id: number) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  
+  await db
+    .update(announcements)
+    .set({ isPublished: 1, publishedAt: new Date() })
+    .where(eq(announcements.id, id));
+}
+
+export async function disableUser(userId: number) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  
+  // Mark user as disabled by setting a flag (we'll add this to schema if needed)
+  // For now, we can use role = 'disabled' or add a disabled field
+  await db.update(users).set({ role: "user" }).where(eq(users.id, userId));
+}
+
+export async function getAllUsers(limit = 50, offset = 0) {
+  const db = await getDb();
+  if (!db) return [];
+  
+  const result = await db
+    .select({
+      id: users.id,
+      openId: users.openId,
+      name: users.name,
+      email: users.email,
+      role: users.role,
+      createdAt: users.createdAt,
+      lastSignedIn: users.lastSignedIn,
+    })
+    .from(users)
+    .orderBy(desc(users.createdAt))
+    .limit(limit)
+    .offset(offset);
+  
+  return result;
+}
+
+export async function logAdminAction(data: InsertAdminLog) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  
+  await db.insert(adminLogs).values(data);
+}
+
+export async function getAdminLogs(limit = 50, offset = 0) {
+  const db = await getDb();
+  if (!db) return [];
+  
+  const result = await db
+    .select({
+      id: adminLogs.id,
+      adminId: adminLogs.adminId,
+      action: adminLogs.action,
+      targetUserId: adminLogs.targetUserId,
+      details: adminLogs.details,
+      createdAt: adminLogs.createdAt,
+    })
+    .from(adminLogs)
+    .orderBy(desc(adminLogs.createdAt))
+    .limit(limit)
+    .offset(offset);
+  
+  return result;
+}
+
+export async function getSiteStats() {
+  const db = await getDb();
+  if (!db) return null;
+  
+  const result = await db.select().from(siteStats).limit(1);
+  return result[0] || null;
+}
+
+export async function updateSiteStats(data: Partial<InsertSiteStat>) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  
+  const existing = await getSiteStats();
+  if (existing) {
+    await db.update(siteStats).set(data).where(eq(siteStats.id, existing.id));
+  } else {
+    await db.insert(siteStats).values(data as InsertSiteStat);
+  }
 }

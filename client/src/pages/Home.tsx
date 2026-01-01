@@ -35,6 +35,11 @@ export default function Home() {
               <Link href="/profile">
                 <Button variant="ghost">个人中心</Button>
               </Link>
+              {user.role === "admin" && (
+                <Link href="/admin">
+                  <Button variant="ghost" className="text-primary">管理系统</Button>
+                </Link>
+              )}
               <div className="text-sm text-muted-foreground">{user.name || user.email}</div>
             </div>
           </div>

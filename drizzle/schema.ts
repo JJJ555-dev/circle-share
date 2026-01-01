@@ -158,3 +158,59 @@ export const circleCategories = mysqlTable("circle_categories", {
 
 export type CircleCategory = typeof circleCategories.$inferSelect;
 export type InsertCircleCategory = typeof circleCategories.$inferInsert;
+
+
+/**
+ * Announcements table - for admin to publish site-wide announcements
+ */
+export const announcements = mysqlTable("announcements", {
+  id: int("id").autoincrement().primaryKey(),
+  title: varchar("title", { length: 255 }).notNull(),
+  content: text("content").notNull(),
+  createdBy: int("createdBy").notNull().references(() => users.id, { onDelete: "set null" }),
+  isPublished: tinyint("isPublished").default(0).notNull(),
+  publishedAt: timestamp("publishedAt"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+}, (table) => ({
+  createdByIdx: index("created_by_idx").on(table.createdBy),
+  publishedIdx: index("published_idx").on(table.isPublished),
+  publishedAtIdx: index("published_at_idx").on(table.publishedAt),
+}));
+
+export type Announcement = typeof announcements.$inferSelect;
+export type InsertAnnouncement = typeof announcements.$inferInsert;
+
+/**
+ * Admin permissions table - tracks admin privileges and actions
+ */
+export const adminLogs = mysqlTable("admin_logs", {
+  id: int("id").autoincrement().primaryKey(),
+  adminId: int("adminId").notNull().references(() => users.id, { onDelete: "cascade" }),
+  action: mysqlEnum("action", ["user_disabled", "user_enabled", "user_deleted", "announcement_created", "announcement_published", "announcement_deleted", "system_setting_changed"]).notNull(),
+  targetUserId: int("targetUserId").references(() => users.id, { onDelete: "set null" }),
+  details: text("details"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+}, (table) => ({
+  adminIdx: index("admin_idx").on(table.adminId),
+  actionIdx: index("action_idx").on(table.action),
+  createdAtIdx: index("created_at_idx").on(table.createdAt),
+}));
+
+export type AdminLog = typeof adminLogs.$inferSelect;
+export type InsertAdminLog = typeof adminLogs.$inferInsert;
+
+/**
+ * Site statistics table - for tracking site metrics
+ */
+export const siteStats = mysqlTable("site_stats", {
+  id: int("id").autoincrement().primaryKey(),
+  totalUsers: int("totalUsers").default(0),
+  totalCircles: int("totalCircles").default(0),
+  totalFiles: bigint("totalFiles", { mode: "number" }).default(0),
+  totalStorage: bigint("totalStorage", { mode: "number" }).default(0),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+
+export type SiteStat = typeof siteStats.$inferSelect;
+export type InsertSiteStat = typeof siteStats.$inferInsert;

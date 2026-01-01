@@ -9,6 +9,7 @@ import Circles from "./pages/Circles";
 import CircleDetail from "./pages/CircleDetail";
 import Profile from "./pages/Profile";
 import DiscoverCircles from "./pages/DiscoverCircles";
+import AdminDashboard from "./pages/AdminDashboard";
 
 function Router() {
   return (
@@ -18,6 +19,7 @@ function Router() {
       <Route path={"/circles"} component={Circles} />
       <Route path={"/circles/:id"} component={CircleDetail} />
       <Route path={"/profile"} component={Profile} />
+      <Route path={"/admin"} component={AdminDashboard} />
       <Route path={"/404"} component={NotFound} />
       <Route component={NotFound} />
     </Switch>
