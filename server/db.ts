@@ -1,6 +1,6 @@
 import { eq, desc, sql, and } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/mysql2";
-import { InsertUser, users, circles, circleMembers, files, folders, announcements, adminLogs, siteStats, InsertCircle, InsertCircleMember, InsertFile, User, InsertAnnouncement, InsertAdminLog, InsertSiteStat } from "../drizzle/schema";
+import { InsertUser, users, circles, circleMembers, files, folders, announcements, adminLogs, siteStats, paymentOrders, userEarnings, platformEarnings, InsertCircle, InsertCircleMember, InsertFile, User, InsertAnnouncement, InsertAdminLog, InsertSiteStat, InsertPaymentOrder, InsertUserEarning, InsertPlatformEarning } from "../drizzle/schema";
 import { ENV } from './_core/env';
 let _db: ReturnType<typeof drizzle> | null = null;
 
@@ -711,5 +711,101 @@ export async function updateSiteStats(data: Partial<InsertSiteStat>) {
     await db.update(siteStats).set(data).where(eq(siteStats.id, existing.id));
   } else {
     await db.insert(siteStats).values(data as InsertSiteStat);
+  }
+}
+
+
+// ==================== Payment Functions ====================
+
+export async function createPaymentOrder(data: InsertPaymentOrder) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  
+  const result = await db.insert(paymentOrders).values(data);
+  return result;
+}
+
+export async function getPaymentOrder(orderId: number) {
+  const db = await getDb();
+  if (!db) return null;
+  
+  const result = await db.select().from(paymentOrders).where(eq(paymentOrders.id, orderId)).limit(1);
+  return result[0] || null;
+}
+
+export async function updatePaymentOrder(orderId: number, data: Partial<InsertPaymentOrder>) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  
+  await db.update(paymentOrders).set(data).where(eq(paymentOrders.id, orderId));
+}
+
+export async function getUserPaymentOrders(userId: number, limit = 50, offset = 0) {
+  const db = await getDb();
+  if (!db) return [];
+  
+  const result = await db
+    .select()
+    .from(paymentOrders)
+    .where(eq(paymentOrders.buyerId, userId))
+    .orderBy(desc(paymentOrders.createdAt))
+    .limit(limit)
+    .offset(offset);
+  
+  return result;
+}
+
+export async function getSellerPaymentOrders(userId: number, limit = 50, offset = 0) {
+  const db = await getDb();
+  if (!db) return [];
+  
+  const result = await db
+    .select()
+    .from(paymentOrders)
+    .where(and(eq(paymentOrders.sellerId, userId), eq(paymentOrders.status, "completed")))
+    .orderBy(desc(paymentOrders.createdAt))
+    .limit(limit)
+    .offset(offset);
+  
+  return result;
+}
+
+export async function getUserEarnings(userId: number) {
+  const db = await getDb();
+  if (!db) return null;
+  
+  const result = await db.select().from(userEarnings).where(eq(userEarnings.userId, userId)).limit(1);
+  return result[0] || null;
+}
+
+export async function createOrUpdateUserEarnings(userId: number, data: Partial<InsertUserEarning>) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  
+  const existing = await getUserEarnings(userId);
+  if (existing) {
+    await db.update(userEarnings).set(data).where(eq(userEarnings.userId, userId));
+  } else {
+    await db.insert(userEarnings).values({ userId, ...data } as InsertUserEarning);
+  }
+}
+
+export async function getPlatformEarnings(month: string) {
+  const db = await getDb();
+  if (!db) return null;
+  
+  const result = await db.select().from(platformEarnings).where(eq(platformEarnings.month, month)).limit(1);
+  return result[0] || null;
+}
+
+export async function createOrUpdatePlatformEarnings(month: string, data: Partial<InsertPlatformEarning>) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  
+  const existing = await getPlatformEarnings(month);
+  if (existing) {
+    await db.update(platformEarnings).set(data).where(eq(platformEarnings.month, month));
+  } else {
+    await db.insert(platformEarnings).values({ month, ...data } as InsertPlatformEarning);
   }
 }

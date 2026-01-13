@@ -1,4 +1,4 @@
-import { int, mysqlEnum, mysqlTable, text, timestamp, varchar, index, tinyint, bigint } from "drizzle-orm/mysql-core";
+import { int, mysqlEnum, mysqlTable, text, timestamp, varchar, tinyint, bigint, index, decimal } from "drizzle-orm/mysql-core";
 
 /**
  * Core user table backing auth flow.
@@ -89,6 +89,8 @@ export const files = mysqlTable("files", {
   mimeType: varchar("mimeType", { length: 100 }).notNull(),
   fileSize: bigint("fileSize", { mode: "number" }).notNull(),
   fileType: mysqlEnum("fileType", ["video", "audio", "image"]).notNull(),
+  price: decimal("price", { precision: 10, scale: 2 }), // Price for paid downloads (null = free)
+  isPaid: tinyint("isPaid").default(0).notNull(), // Whether file requires payment
   uploadedAt: timestamp("uploadedAt").defaultNow().notNull(),
 }, (table) => ({
   circleIdx: index("circle_idx").on(table.circleId),
@@ -214,3 +216,65 @@ export const siteStats = mysqlTable("site_stats", {
 
 export type SiteStat = typeof siteStats.$inferSelect;
 export type InsertSiteStat = typeof siteStats.$inferInsert;
+
+
+/**
+ * Payment orders table - for tracking image purchase transactions
+ */
+export const paymentOrders = mysqlTable("payment_orders", {
+  id: int("id").autoincrement().primaryKey(),
+  fileId: int("fileId").notNull().references(() => files.id, { onDelete: "cascade" }),
+  buyerId: int("buyerId").notNull().references(() => users.id, { onDelete: "cascade" }),
+  sellerId: int("sellerId").notNull().references(() => users.id, { onDelete: "cascade" }),
+  amount: decimal("amount", { precision: 10, scale: 2 }).notNull(), // Total amount
+  platformFee: decimal("platformFee", { precision: 10, scale: 2 }).notNull(), // 0.1% platform fee
+  sellerAmount: decimal("sellerAmount", { precision: 10, scale: 2 }).notNull(), // Amount seller receives
+  paymentMethod: mysqlEnum("paymentMethod", ["wechat", "alipay"]).notNull(),
+  status: mysqlEnum("status", ["pending", "completed", "failed", "refunded"]).default("pending").notNull(),
+  transactionId: varchar("transactionId", { length: 255 }).unique(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  completedAt: timestamp("completedAt"),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+}, (table) => ({
+  fileIdIdx: index("file_id_idx").on(table.fileId),
+  buyerIdIdx: index("buyer_id_idx").on(table.buyerId),
+  sellerIdIdx: index("seller_id_idx").on(table.sellerId),
+  statusIdx: index("status_idx").on(table.status),
+  createdAtIdx: index("created_at_idx").on(table.createdAt),
+}));
+
+export type PaymentOrder = typeof paymentOrders.$inferSelect;
+export type InsertPaymentOrder = typeof paymentOrders.$inferInsert;
+
+/**
+ * User earnings table - for tracking seller earnings
+ */
+export const userEarnings = mysqlTable("user_earnings", {
+  id: int("id").autoincrement().primaryKey(),
+  userId: int("userId").notNull().references(() => users.id, { onDelete: "cascade" }),
+  totalEarnings: decimal("totalEarnings", { precision: 15, scale: 2 }),
+  withdrawnAmount: decimal("withdrawnAmount", { precision: 15, scale: 2 }),
+  availableAmount: decimal("availableAmount", { precision: 15, scale: 2 }),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+}, (table) => ({
+  userIdIdx: index("user_id_idx").on(table.userId),
+}));
+
+export type UserEarning = typeof userEarnings.$inferSelect;
+export type InsertUserEarning = typeof userEarnings.$inferInsert;
+
+/**
+ * Platform earnings table - for tracking platform revenue
+ */
+export const platformEarnings = mysqlTable("platform_earnings", {
+  id: int("id").autoincrement().primaryKey(),
+  totalEarnings: decimal("totalEarnings", { precision: 15, scale: 2 }),
+  month: varchar("month", { length: 7 }).notNull(), // YYYY-MM format
+  transactionCount: int("transactionCount").default(0),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+}, (table) => ({
+  monthIdx: index("month_idx").on(table.month),
+}));
+
+export type PlatformEarning = typeof platformEarnings.$inferSelect;
+export type InsertPlatformEarning = typeof platformEarnings.$inferInsert;
